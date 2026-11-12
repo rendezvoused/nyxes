@@ -21,40 +21,59 @@ let icons = [
 
 /* DROPBOX AUDIO URLS */
 let urls = [
-  "https://dl.dropbox.com/scl/fi/xigp6bd4i6gbpwne5ru9p/There-Is-a-Light-That-Never-Goes-Out-2017-Master-128-kbps.mp3?rlkey=pyy3kk7x48rsvc905bl45niug&st=85crb0nn&dl=0",
-  "https://dll.dropbox.com/scl/fi/xigp6bd4i6gbpwne5ru9p/There-Is-a-Light-That-Never-Goes-Out-2017-Master-128-kbps.mp3?rlkey=pyy3kk7x48rsvc905bl45n",
-  "https://www.dropbox.com/scl/fi/TU_ARCHIVO_3.mp3?rlkey=xxx&dl=0"
+  "https://www.dropbox.com/scl/fi/xigp6bd4i6gbpwne5ru9p/There-Is-a-Light-That-Never-Goes-Out-2017-Master-128-kbps.mp3?rlkey=pyy3kk7x48rsvc905bl45niug&st=85crb0nn&dl=0",
+  "https://www.dropbox.com/scl/fi/ENLACE_2.mp3?rlkey=TU_RLKEY&dl=0",
+  "https://www.dropbox.com/scl/fi/ENLACE_3.mp3?rlkey=TU_RLKEY&dl=0"
 ];
 
-/* OTHER */
+/* ELEMENTOS DEL DOM (nyxes) */
 var prevButton = document.getElementById('prev-song');
 var nextButton = document.getElementById('next-song');
 var playButton = document.getElementById('play-song');
 var pauseButton = document.getElementById('pause-song');
 var songButtons = document.getElementById('bark-left-songs');
+var shuffleButton = document.querySelector('.ph-shuffle');
+var progressContainer = document.querySelector('.progress');
+var progressBar = document.querySelector('.progress div');
 
-/* SETUP */
+/* INICIALIZAR REPRODUCTOR HTML5 DENTRO DE #player */
+var playerContainer = document.getElementById('player');
+var audio = document.createElement('audio');
+audio.id = 'audio-player';
+audio.preload = 'metadata';
+if (playerContainer) {
+  playerContainer.appendChild(audio);
+}
+
+/* ESTADO */
 let currentSong = 0;
-let audio = new Audio();
+let isShuffle = false;
 
-// Convierte automáticamente enlaces de Dropbox (dl=0 o dl=1) a formato de streaming directo (raw=1)
+/* CONVERSIÓN DE ENLACES DE DROPBOX (dl=0 / dl=1 -> raw=1) */
 function formatDropboxUrl(url) {
+  if (!url) return '';
   if (url.includes('dropbox.com')) {
     if (/([?&])dl=[01]/.test(url)) {
       return url.replace(/([?&])dl=[01]/g, '$1raw=1');
-    } else if (!url.includes('raw=1')) {
+    }
+    if (!url.includes('raw=1')) {
       return url + (url.includes('?') ? '&raw=1' : '?raw=1');
     }
   }
   return url;
 }
 
+/* ACTUALIZAR INTERFAZ (TÍTULOS, ARTISTA, PORTADA Y LISTA) */
 function updateSongUI() {
   $("#songtitle").html(titles[currentSong]);
   $("#artistname").html(names[currentSong]);
   $("#songtitle2").html(titles[currentSong]);
   $("#artistname2").html(names[currentSong]);
   $("#bark-music-img img").attr("src", icons[currentSong]);
+
+  if (progressBar) {
+    progressBar.style.width = '0%';
+  }
 
   for (var i = 0; i < barkSongs.length; i++) {
     barkSongs[i].classList.remove('is-active');
@@ -64,7 +83,7 @@ function updateSongUI() {
   }
 }
 
-// Renderizar lista de canciones
+/* GENERAR LISTA EN #bark-left-songs */
 titles.forEach(function(title, i) {
   var activeClass = (i === currentSong) ? 'is-active' : '';
   songButtons.innerHTML += '<div class="bark-songs ' + activeClass + '">' + title + '</div>';
@@ -72,10 +91,11 @@ titles.forEach(function(title, i) {
 
 var barkSongs = document.querySelectorAll('.bark-songs');
 
-// Precargar la primera canción
+/* CARGAR PRIMERA PISTA */
 audio.src = formatDropboxUrl(urls[currentSong]);
 updateSongUI();
 
+/* CONTROLES DE REPRODUCCIÓN */
 function loadAndPlay(index) {
   currentSong = index;
   audio.src = formatDropboxUrl(urls[currentSong]);
@@ -88,8 +108,8 @@ function playAudio() {
     $('#play-song').addClass('hidden');
     $('#pause-song').removeClass('hidden');
     $('.bark-record').addClass('rotate');
-  }).catch(function(error) {
-    console.error('Error al reproducir el audio:', error);
+  }).catch(function(err) {
+    console.error('No se pudo reproducir el archivo de Dropbox:', err);
   });
 }
 
@@ -101,27 +121,20 @@ function pauseAudio() {
 }
 
 function playNextSong() {
-  var nextIndex = (currentSong + 1) % urls.length;
-  loadAndPlay(nextIndex);
+  if (isShuffle && urls.length > 1) {
+    let randomIndex;
+    do {
+      randomIndex = Math.floor(Math.random() * urls.length);
+    } while (randomIndex === currentSong);
+    loadAndPlay(randomIndex);
+  } else {
+    let nextIndex = (currentSong + 1) % urls.length;
+    loadAndPlay(nextIndex);
+  }
 }
 
 function playPrevSong() {
-  var prevIndex = (currentSong - 1 + urls.length) % urls.length;
-  loadAndPlay(prevIndex);
-}
-
-/* EVENTOS */
-prevButton.addEventListener('click', playPrevSong);
-nextButton.addEventListener('click', playNextSong);
-playButton.addEventListener('click', playAudio);
-pauseButton.addEventListener('click', pauseAudio);
-
-// Pasar a la siguiente canción cuando termina la actual
-audio.addEventListener('ended', playNextSong);
-
-// Permitir seleccionar canciones haciendo clic en la lista
-barkSongs.forEach(function(item, index) {
-  item.addEventListener('click', function() {
-    loadAndPlay(index);
-  });
-});
+  if (audio.currentTime > 3) {
+    audio.currentTime = 0;
+    return;
+  }
